@@ -40,18 +40,18 @@ async function run(){
  const profileCollection = client.db("fish-zone").collection("profiles");
 
 
- //Middleware for Admin
- const verifiedAdmin = async(req,res,next)=>{
-  const adminRequester = req.decoded.email;
-  const adminRequesterMail = await userCollection.findOne({email: adminRequester});
-  if (adminRequesterMail.role ==='admin') {
-      next();
+ const verifyAdmin = async(req, res, next)=>{
+  const requester = req.decoded.email;
+  const query = {email: requester}
+  const requesterAccount = await userCollection.findOne(query);
+  if(requesterAccount.role === "admin"){
+    next();
   }
   else{
-   res.status(403).send({message:"forbidden, Only admin can Access"});
+    res.status(403).send({message: "forbidden"});
   }
-
 }
+
 
 //GET DATA myOWN Inserted DATA
 app.get('/equitment', async (req, res) => {
@@ -92,7 +92,7 @@ app.post("/order", verifyJwt, async (req, res) => {
   app.delete("/order/:id", async (req, res) => {
     const id = req.params.id;
     const filter = { _id: ObjectId(id) };
-    const result = await ordersCollection.deleteOne(filter);
+    const result = await orderCollection.deleteOne(filter);
     res.send(result);
   });
 
@@ -115,6 +115,39 @@ app.post('/profile', async (req, res) => {
   const result = await profileCollection.insertOne(profileInfo);
   res.send(result);
 });
+
+ // get all users api
+ app.get('/user', verifyJwt, verifyAdmin , async(req, res)=>{
+  const users = await userCollection.find({}).toArray();
+  res.send(users)
+})
+
+// make admin api
+app.put('/user/admin/:email', verifyJwt, verifyAdmin, async(req, res)=>{
+  const email = req.params.email;
+  const filter = {email: email};
+  const updatedDoc = {
+    $set: {
+      role: "admin"
+    },
+  };
+  const result = await userCollection.updateOne(filter, updatedDoc);
+  res.send(result);
+})
+
+
+
+    // useAdmin hooks api
+    app.get("/admin/:email", verifyJwt, async(req, res)=>{
+      const email = req.params.email;
+      const filter = {email: email};
+      const user = await userCollection.findOne(filter);
+      const isAdmin = user.role === "admin";
+      res.send({admin: isAdmin});
+    })
+   
+
+
 
 app.get("/user/:email", async (req, res) => {
   const email = req.params.email;
