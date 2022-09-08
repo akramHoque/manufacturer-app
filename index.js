@@ -10,25 +10,20 @@ app.use(cors());
 app.use(express.json());
 
 //jwt-token-to-backend-for-Verification
-function verifiedToken(req, res, next) {
+const verifyJwt = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
-    //console.log('ABC');
-    return res.status(401).send({ message: 'UnAuthorized access! Kire tor token koi? Its not ur data!' });
+    return res.status(401).send({ message: "Unauthorized access" });
   }
-
-  //Iqnore Bearer
-  const token = authHeader.split(' ')[1];
-  // VERIFY user-token of 
-  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+  const token = authHeader.split(" ")[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
     if (err) {
-      return res.status(403).send({ message: 'Forbidden! Access denied.' })
-    } //Decoded valid user representor
+      return res.status(403).send({ message: "Forbidden access" });
+    }
     req.decoded = decoded;
-    //console.log(decoded);
     next();
   });
-}
+};
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.g6r3dap.mongodb.net/?retryWrites=true&w=majority`;
@@ -67,67 +62,50 @@ app.get('/equitment', async (req, res) => {
 });
 
 
-//Sent Individual data using Id 
-app.get('/equitment/:id', async (req, res) => {
+
+
+app.get("/equitment/:id", verifyJwt, async (req, res) => {
   const id = req.params.id;
-  const query = { _id: ObjectId(id) };
-  const equitment = await partsCollection.findOne(query);
-  res.send(equitment);
+  const filter = { _id: ObjectId(id) };
+  const product = await partsCollection.findOne(filter);
+  res.send(product);
 });
 
-//Inserted Individual Order data
-app.post('/order', async (req, res) => {
-  const orders = req.body;
-  const result = await orderCollection.insertOne(orders);
-  return res.send({ success: true, result });
-})
 
 
- //find user Individual order Find using email 
- app.get('/order', async (req, res) => {
-  const customerMail = req?.query?.customerMail;
+// add order api
+app.post("/order", verifyJwt, async (req, res) => {
+  const order = req.body;
+  const result = await orderCollection.insertOne(order);
+  res.send(result);
+});
 
-  const decodedEmail = req?.decoded?.email;
-  if (customerMail === decodedEmail) {
-    const query = { customerMail: customerMail };
-    const orderShow = await orderCollection.find(query).toArray();
-    res.send(orderShow);
-  }
-  else {
-    return res.status(403).send({ message: "forbidden, Its not your cup of Tea" })
-  }
-})
-
-//Delete user Individual order data using email
-app.delete('/order/:email', async (req, res) => {
+ // get specific user order
+ app.get("/order/:email", async (req, res) => {
   const email = req.params.email;
-  const filter = { customerMail: email };
-  const result = await orderCollection.deleteOne(filter);
+  const query = {customerEmail: email};
+  const orders = (await orderCollection.find(query).toArray()).reverse();
+  res.send(orders);
+});
+
+  // delete order api
+  app.delete("/order/:id", async (req, res) => {
+    const id = req.params.id;
+    const filter = { _id: ObjectId(id) };
+    const result = await ordersCollection.deleteOne(filter);
+    res.send(result);
+  });
+
+// add review api
+app.post("/review", async (req, res) => {
+  const review = req.body;
+  const result = await reviewCollection.insertOne(review);
   res.send(result);
 });
 
- // gET underscore Id for payment 
- app.get('/order/:id', async (req,res)=>{
-  const id = req.params.id;
-  const query = {_id: ObjectId(id)};
-  const ordered = await orderCollection.findOne(query);
-  res.send(ordered);
-
-})
-
-//Customer review Stored
-app.post('/review', async (req, res) => {
-  const reviews = req.body;
-  const result = await reviewCollection.insertOne(reviews);
-  res.send(result);
-});
-
-//GET review myOWN Inserted DATA
-app.get('/review',async (req, res) => {
-  const query = {};
-  const cursor = reviewCollection.find(query);
-  const reviews = await cursor.toArray();
-  res.send(reviews);
+app.get("/reviews", async (req, res) => {
+  const review = (await reviewCollection.find({}).toArray()).reverse();
+  res.send(review);
 });
 
 
@@ -138,45 +116,55 @@ app.post('/profile', async (req, res) => {
   res.send(result);
 });
 
-  //OUR ALL USER INFO API 
-  app.get('/users', async (req, res) => {
-    const users = await userCollection.find().toArray();
-    res.send(users);
-  })
+app.get("/user/:email", async (req, res) => {
+  const email = req.params.email;
+  const query = { email: email };
+  const user = await userCollection.findOne(query);
+  res.send(user);
+});
 
-
-   //all user in database | implementToken
-   app.put('/user/:email', async (req, res) => {
+app.put("/updateUser/:email", verifyJwt, async (req, res) => {
+  const updateUser = req.body;
+  const { education, address, phone, linkedIn } = updateUser;
+  const email = req.params.email;
+  const filter = { email: email };
+  const options = { upsert: true };
+  const updatedDoc = {
+    $set: {
+      education: education,
+      address: address,
+      phone: phone,
+      linkedIn: linkedIn,
+    },
+  };
+  const result = await userCollection.updateOne(
+    filter,
+    updatedDoc,
+    options
+  );
+  res.send(result);
+});
+  app.put("/user/:email", async (req, res) => {
     const email = req.params.email;
     const user = req.body;
     const filter = { email: email };
     const options = { upsert: true };
-    const updateDoc = {
+    const updatedDoc = {
       $set: user,
     };
-    const result = await userCollection.updateOne(filter, updateDoc, options);
-    const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' }) //Jwt token issue-1st then>Verify
+    const result = await userCollection.updateOne(
+      filter,
+      updatedDoc,
+      options
+    );
+    const token = jwt.sign(
+      { email: email },
+      process.env.ACCESS_TOKEN_SECRET,
+      { expiresIn: "1d" }
+    );
     res.send({ result, token });
   });
-
-    //Without admin U cant entry users route
-    app.get('/admin/:email', async (req, res) => {
-      const email = req.params.email;
-      const user = await userCollection.findOne({ email: email });
-      const isAdmin = user.role === 'admin';
-      res.send({ admin: isAdmin })
-    })
-
-  // Given role:Admin on user 
-  app.put('/user/admin/:email', async (req, res) => {
-    const email = req.params.email;
-    const filter = { email: email };
-    const updateDoc = {
-      $set: { role: 'admin' },
-    };
-    const result = await userCollection.updateOne(filter, updateDoc);
-    res.send(result);
-  });
+ 
 
   }
   finally{
