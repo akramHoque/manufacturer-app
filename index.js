@@ -289,7 +289,7 @@ run().catch(console.dir)
 
 
 app.get('/', (req, res) => {
-  res.send('Hello from Hunting Fishzone developing server')
+  res.send('Hello we are from Hunting Fishzone developing server by MD. Akramul')
 })
 
 app.listen(port, () => {
