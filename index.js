@@ -289,9 +289,9 @@ run().catch(console.dir)
 
 
 app.get('/', (req, res) => {
-  res.send('Hello World from Huntor Fishzone developing server')
+  res.send('Hello from Hunting Fishzone developing server')
 })
 
 app.listen(port, () => {
-  console.log(`Manufacturer app listening on port ${port}`)
+  console.log(`Manufacturer apps  listening on port ${port}`)
 })
